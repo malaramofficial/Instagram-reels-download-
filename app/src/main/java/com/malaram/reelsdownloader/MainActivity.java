@@ -159,7 +159,7 @@ public class MainActivity extends Activity {
         root.addView(space(18));
 
         root.addView(space(18));
-        TextView footer/ = text("ReelMate • Version 1.0 • Use only with content you are permitted to save",
+        TextView footer = text("ReelMate • Version 1.0 • Use only with content you are permitted to save",
                 11, Color.rgb(100, 116, 139));
         footer.setGravity(Gravity.CENTER);
         root.addView(footer, matchWrap());
