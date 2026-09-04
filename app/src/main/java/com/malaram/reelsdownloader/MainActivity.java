@@ -49,6 +49,11 @@ public class MainActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        Button backButton = button("←  Back", Color.TRANSPARENT, Color.WHITE);
+        backButton.setOnClickListener(v -> finish());
+        root.addView(backButton, new LinearLayout.LayoutParams(dp(110), dp(48)));
+        root.addView(space(6));
+
         // Top bar
         LinearLayout top = row();
         top.setGravity(Gravity.CENTER_VERTICAL);
@@ -153,53 +158,8 @@ public class MainActivity extends Activity {
 
         root.addView(space(18));
 
-        // Creator card
-        LinearLayout creator = card(Color.rgb(30, 41, 59), 22);
-        LinearLayout creatorTop = row();
-        TextView avatar = text("M", 26, Color.WHITE);
-        avatar.setGravity(Gravity.CENTER);
-        avatar.setTypeface(null, 1);
-        avatar.setBackground(round(Color.rgb(14, 165, 233), 34));
-        creatorTop.addView(avatar, new LinearLayout.LayoutParams(dp(68), dp(68)));
-
-        LinearLayout creatorText = new LinearLayout(this);
-        creatorText.setOrientation(LinearLayout.VERTICAL);
-        creatorText.setPadding(dp(14), 0, 0, 0);
-        TextView madeBy = text("Made by Mala Ram", 18, Color.WHITE);
-        madeBy.setTypeface(null, 1);
-        TextView role = text("Creator & Developer", 13, Color.rgb(148, 163, 184));
-        creatorText.addView(madeBy);
-        creatorText.addView(role);
-        creatorTop.addView(creatorText, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        creator.addView(creatorTop);
-
-        TextView creatorNote = text("Connect with me for updates, ideas and support.", 13,
-                Color.rgb(203, 213, 225));
-        creatorNote.setPadding(0, dp(14), 0, dp(10));
-        creator.addView(creatorNote);
-
-        LinearLayout social = row();
-        Button insta = button("Instagram", Color.rgb(225, 48, 108), Color.WHITE);
-        insta.setOnClickListener(v -> openUrl("https://www.instagram.com/malaramofficial/"));
-        social.addView(insta, new LinearLayout.LayoutParams(0, dp(48), 1f));
-
-        Button mail = button("Email", Color.rgb(51, 65, 85), Color.WHITE);
-        mail.setOnClickListener(v -> openUrl("mailto:malaramofficial@gmail.com"));
-        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        mp.setMargins(dp(8), 0, 0, 0);
-        social.addView(mail, mp);
-
-        Button whatsapp = button("WhatsApp", Color.rgb(22, 163, 74), Color.WHITE);
-        whatsapp.setOnClickListener(v -> openUrl("https://wa.me/918302776659"));
-        LinearLayout.LayoutParams wp = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        wp.setMargins(dp(8), 0, 0, 0);
-        social.addView(whatsapp, wp);
-        creator.addView(social);
-        root.addView(creator);
-
         root.addView(space(18));
-        TextView footer = text("ReelMate • Version 1.0 • Use only with content you are permitted to save",
+        TextView footer/ = text("ReelMate • Version 1.0 • Use only with content you are permitted to save",
                 11, Color.rgb(100, 116, 139));
         footer.setGravity(Gravity.CENTER);
         root.addView(footer, matchWrap());
