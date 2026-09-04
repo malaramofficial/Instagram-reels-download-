@@ -1,6 +1,6 @@
 /**
- * Official Meta API integration for media owned by the authorized account.
- * Secrets remain only in the deployment environment.
+ * Official Meta API integration for media accessible to the authorized account.
+ * Secrets stay in the deployment environment.
  */
 import express from "express";
 
@@ -10,40 +10,37 @@ app.use(express.json({ limit: "8kb" }));
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
 const TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const ACCOUNT_ID = process.env.ALLOWED_INSTAGRAM_ACCOUNT_ID;
-
-// Instagram Login uses graph.instagram.com. Facebook Login integrations can use
-// graph.facebook.com. We try the configured host first, then the compatible host.
-const PRIMARY_HOST = process.env.META_API_HOST || "https://graph.instagram.com";
+const PRIMARY_HOST = (process.env.META_API_HOST || "https://graph.instagram.com").replace(/\/$/, "");
 const FALLBACK_HOST = PRIMARY_HOST.includes("graph.instagram.com")
   ? "https://graph.facebook.com"
   : "https://graph.instagram.com";
 
-app.get("/", (_req, res) =>
-  res.json({ service: "authorized-instagram-media-resolver", ok: true })
-);
+app.get("/", (_req, res) => {
+  res.json({ service: "authorized-instagram-media-resolver", ok: true });
+});
 
-app.get("/health", (_req, res) =>
+app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     configured: Boolean(TOKEN && ACCOUNT_ID),
     apiHost: PRIMARY_HOST,
     graphVersion: GRAPH_VERSION
-  })
-);
+  });
+});
 
 app.get("/diagnostics", async (_req, res) => {
   if (!TOKEN || !ACCOUNT_ID) {
-    return res.status(503).json({ ok: false, configured: false, error: "Server API credentials are not configured" });
+    return res.status(503).json({
+      ok: false,
+      configured: false,
+      error: "Server API credentials are not configured"
+    });
   }
 
-  const hosts = [PRIMARY_HOST, FALLBACK_HOST]
-    .filter((value, index, list) => list.indexOf(value) === index);
-
   const attempts = [];
-  for (const host of hosts) {
+  for (const host of uniqueHosts()) {
     try {
-      const endpoint = mediaListUrl(host);
-      const response = await fetch(endpoint);
+      const response = await fetch(mediaListUrl(host));
       const payload = await safeJson(response);
       attempts.push({
         host,
@@ -60,7 +57,12 @@ app.get("/diagnostics", async (_req, res) => {
     }
   }
 
-  return res.status(502).json({ ok: false, configured: true, graphVersion: GRAPH_VERSION, attempts });
+  return res.status(502).json({
+    ok: false,
+    configured: true,
+    graphVersion: GRAPH_VERSION,
+    attempts
+  });
 });
 
 app.post("/resolve", async (req, res) => {
@@ -69,6 +71,7 @@ app.post("/resolve", async (req, res) => {
   if (!isInstagramUrl(originalUrl)) {
     return res.status(400).json({ authorized: false, error: "Invalid Instagram URL" });
   }
+
   if (!TOKEN || !ACCOUNT_ID) {
     return res.status(503).json({
       authorized: false,
@@ -77,11 +80,9 @@ app.post("/resolve", async (req, res) => {
   }
 
   try {
-    // Shared Instagram links can be redirect URLs. Canonicalize only after
-    // confirming that the final destination is still an Instagram URL.
     const sharedUrl = await canonicalizeInstagramUrl(originalUrl);
-
     const result = await findAuthorizedMedia(sharedUrl);
+
     if (!result.item) {
       return res.status(404).json({
         authorized: false,
@@ -90,7 +91,6 @@ app.post("/resolve", async (req, res) => {
       });
     }
 
-    // Re-read the matched media object so the API returns a fresh media_url.
     const fresh = await getMediaById(result.host, result.item.id);
     const item = fresh || result.item;
 
@@ -111,25 +111,22 @@ app.post("/resolve", async (req, res) => {
     });
   } catch (error) {
     console.error("Resolve failed:", error?.message || error);
-    return res.status(500).json({
-      authorized: false,
-      error: "Resolver failed"
-    });
+    return res.status(500).json({ authorized: false, error: "Resolver failed" });
   }
 });
 
-async function findAuthorizedMedia(sharedUrl) {
-  const hosts = [PRIMARY_HOST, FALLBACK_HOST]
-    .filter((value, index, list) => list.indexOf(value) === index);
+function uniqueHosts() {
+  return [...new Set([PRIMARY_HOST, FALLBACK_HOST])];
+}
 
+async function findAuthorizedMedia(sharedUrl) {
   let lastError = null;
 
-  for (const host of hosts) {
+  for (const host of uniqueHosts()) {
     try {
       let endpoint = mediaListUrl(host);
       let pages = 0;
 
-      // Follow official API pagination so older media is not missed.
       while (endpoint && pages < 50) {
         pages += 1;
         const response = await fetch(endpoint);
@@ -141,11 +138,10 @@ async function findAuthorizedMedia(sharedUrl) {
         }
 
         const item = Array.isArray(payload?.data)
-          ? payload.data.find(media => sameInstagramUrl(media.permalink, sharedUrl))
+          ? payload.data.find((media) => sameInstagramUrl(media.permalink, sharedUrl))
           : null;
 
         if (item) return { item, host };
-
         endpoint = payload?.paging?.next || null;
       }
     } catch (error) {
@@ -158,9 +154,7 @@ async function findAuthorizedMedia(sharedUrl) {
 }
 
 function mediaListUrl(host) {
-  const endpoint = new URL(
-    `${host}/${GRAPH_VERSION}/${encodeURIComponent(ACCOUNT_ID)}/media`
-  );
+  const endpoint = new URL(`${host}/${GRAPH_VERSION}/${encodeURIComponent(ACCOUNT_ID)}/media`);
   endpoint.searchParams.set(
     "fields",
     "id,permalink,media_type,media_url,thumbnail_url,timestamp"
@@ -171,9 +165,7 @@ function mediaListUrl(host) {
 }
 
 async function getMediaById(host, mediaId) {
-  const endpoint = new URL(
-    `${host}/${GRAPH_VERSION}/${encodeURIComponent(mediaId)}`
-  );
+  const endpoint = new URL(`${host}/${GRAPH_VERSION}/${encodeURIComponent(mediaId)}`);
   endpoint.searchParams.set(
     "fields",
     "id,permalink,media_type,media_url,thumbnail_url,timestamp"
@@ -193,9 +185,9 @@ async function canonicalizeInstagramUrl(value) {
       headers: { "User-Agent": "Mozilla/5.0" }
     });
     const finalUrl = response.url || value;
-    return isInstagramUrl(finalUrl) ? normalize(finalUrl) : normalize(value);
+    return isInstagramUrl(finalUrl) ? normalizeInstagramUrl(finalUrl) : normalizeInstagramUrl(value);
   } catch {
-    return normalize(value);
+    return normalizeInstagramUrl(value);
   }
 }
 
@@ -207,33 +199,32 @@ async function safeJson(response) {
   }
 }
 
-function sameInstagramUrl(a, b) {
-  return normalize(a || "") === normalize(b || "");
-}
-
-function normalize(value) {
+function isInstagramUrl(value) {
   try {
     const u = new URL(value);
-    if (!/(^|\\.)instagram\\.com$/i.test(u.hostname)) return "";
-    u.protocol = "https:";
-    u.hostname = "www.instagram.com";
-    u.hash = "";
-    u.search = "";
-    let path = u.pathname.replace(/\\/+$/, "");
-    return `https://www.instagram.com${path}/`;
+    const host = u.hostname.toLowerCase();
+    return (u.protocol === "https:" || u.protocol === "http:") &&
+      (host === "instagram.com" || host.endsWith(".instagram.com"));
+  } catch {
+    return false;
+  }
+}
+
+function normalizeInstagramUrl(value) {
+  try {
+    const u = new URL(value);
+    const host = u.hostname.toLowerCase();
+    if (!(host === "instagram.com" || host.endsWith(".instagram.com"))) return "";
+
+    const path = u.pathname.replace(/\/+$/, "") || "/";
+    return `https://www.instagram.com${path.endsWith("/") ? path : path + "/"}`;
   } catch {
     return "";
   }
 }
 
-function isInstagramUrl(value) {
-  try {
-    const u = new URL(value);
-    return (u.protocol === "https:" || u.protocol === "http:") &&
-      /(^|\\.)instagram\\.com$/i.test(u.hostname);
-  } catch {
-    return false;
-  }
+function sameInstagramUrl(a, b) {
+  return normalizeInstagramUrl(a || "") === normalizeInstagramUrl(b || "");
 }
 
 app.listen(process.env.PORT || 3000, () => {
