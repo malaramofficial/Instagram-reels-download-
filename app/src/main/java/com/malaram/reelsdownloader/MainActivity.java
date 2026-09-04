@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        Button backButton = button("←  Back", Color.TRANSPARENT, Color.WHITE);
+        Button backButton = button("Back", Color.TRANSPARENT, Color.WHITE);
         backButton.setOnClickListener(v -> finish());
         root.addView(backButton, new LinearLayout.LayoutParams(dp(110), dp(48)));
         root.addView(space(6));
@@ -90,13 +90,13 @@ public class MainActivity extends Activity {
         heroIcon.setBackground(round(Color.rgb(124, 58, 237), 42));
         hero.addView(heroIcon, new LinearLayout.LayoutParams(dp(84), dp(84)));
 
-        TextView heroTitle = text("Instagram Video Downloader", 22, Color.WHITE);
+        TextView heroTitle = text("Prepare your download", 22, Color.WHITE);
         heroTitle.setGravity(Gravity.CENTER);
         heroTitle.setTypeface(null, 1);
         heroTitle.setPadding(0, dp(16), 0, dp(6));
         hero.addView(heroTitle, matchWrap());
 
-        TextView heroText = text("Paste a public Instagram Reel or video link and let ReelMate process it.", 14,
+        TextView heroText = text("Paste a supported public link. ReelMate will process available media.", 14,
                 Color.rgb(203, 213, 225));
         heroText.setGravity(Gravity.CENTER);
         hero.addView(heroText, matchWrap());
@@ -106,11 +106,11 @@ public class MainActivity extends Activity {
 
         // Download panel
         LinearLayout panel = card(Color.WHITE, 22);
-        TextView panelTitle = text("Download a video", 19, Color.rgb(15, 23, 42));
+        TextView panelTitle = text("Paste your link", 19, Color.rgb(15, 23, 42));
         panelTitle.setTypeface(null, 1);
         panel.addView(panelTitle, matchWrap());
 
-        TextView hint = text("Paste the Instagram link below", 13, Color.rgb(100, 116, 139));
+        TextView hint = text("Use a public link that you are permitted to save", 13, Color.rgb(100, 116, 139));
         hint.setPadding(0, dp(4), 0, dp(10));
         panel.addView(hint, matchWrap());
 
@@ -130,7 +130,7 @@ public class MainActivity extends Activity {
         paste.setOnClickListener(v -> pasteFromClipboard());
         actions.addView(paste, new LinearLayout.LayoutParams(0, dp(52), 0.34f));
 
-        downloadButton = button("Download Video", Color.rgb(124, 58, 237), Color.WHITE);
+        downloadButton = button("Continue", Color.rgb(124, 58, 237), Color.WHITE);
         downloadButton.setTypeface(null, 1);
         downloadButton.setOnClickListener(v -> startProcessing());
         LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(0, dp(52), 0.66f);
@@ -199,7 +199,7 @@ public class MainActivity extends Activity {
                 if (value != null) {
                     linkInput.setText(value.toString().trim());
                     linkInput.setSelection(linkInput.length());
-                    status.setText("Link pasted. Tap Download Video.");
+                    status.setText("Link pasted. Tap Continue.");
                     return;
                 }
             }
@@ -247,7 +247,7 @@ public class MainActivity extends Activity {
         status.setText(message);
         downloadButton.setEnabled(!loading);
         downloadButton.setAlpha(loading ? 0.65f : 1f);
-        downloadButton.setText(loading ? "Processing..." : "Download Video");
+        downloadButton.setText(loading ? "Processing..." : "Continue");
     }
 
     private void enqueueDownload(String url) {
