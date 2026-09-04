@@ -1,0 +1,6 @@
+{
+  "name": "Reels Downloader",
+  "description": "Download Instagram Reels easily with fastvideosave.net integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Shadow / Outer Accent (Subtle glow) -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M27,29 h54 a8,8 0 0 1 8,8 v54 a8,8 0 0 1 -8,8 h-54 a8,8 0 0 1 -8,-8 v-54 a8,8 0 0 1 8,-8 Z" />
+
+    <!-- White Frame representing Instagram Reels Container -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M26,26 h56 a8,8 0 0 1 8,8 v56 a8,8 0 0 1 -8,8 h-56 a8,8 0 0 1 -8,-8 v-56 a8,8 0 0 1 8,-8 Z M32,32 v44 h44 v-44 Z" />
+
+    <!-- Film strip side holes for a Reel Look -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,35 h4 v4 h-4 z M35,45 h4 v4 h-4 z M35,55 h4 v4 h-4 z M35,65 h4 v4 h-4 z M69,35 h4 v4 h-4 z M69,45 h4 v4 h-4 z M69,55 h4 v4 h-4 z M69,65 h4 v4 h-4 z" />
+
+    <!-- Bold Downward Download Arrow in Center -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,38 h8 v14 h8 l-12,12 l-12,-12 h8 Z" />
+
+    <!-- Tray line under the arrow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,68 h20 v4 h-20 Z" />
+
+</vector>
