@@ -15,5 +15,7 @@ public final class Ui {
     public static Button button(Activity a,String s,int bg,int fg){Button b=new Button(a);b.setText(s);b.setTextColor(fg);b.setTextSize(13);b.setAllCaps(false);b.setBackground(bg(a,bg,16));return b;}
     public static LinearLayout card(Activity a,int color){LinearLayout l=new LinearLayout(a);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(a,18),dp(a,18),dp(a,18),dp(a,18));l.setBackground(bg(a,color,22));return l;}
     public static void space(LinearLayout l,Activity a,int h){Space s=new Space(a);l.addView(s,new LinearLayout.LayoutParams(1,dp(a,h)));}
-    public static final int NAVY=Color.rgb(15,23,42), CARD=Color.rgb(30,41,59), PURPLE=Color.rgb(124,58,237), MUTED=Color.rgb(148,163,184);
+    public static final int NAVY=Color.rgb(15,23,42), CARD=Color.rgb(30,41,59), PURPLE=Color.rgb(124,58,237), MUTED=Color.rgb(148,163,184), WHITE=Color.WHITE;
+    public static TextView heading(Activity a,String s){TextView v=text(a,s,26,WHITE);v.setTypeface(null,1);return v;}
+    public static TextView subtitle(Activity a,String s){return text(a,s,13,MUTED);}
 }
