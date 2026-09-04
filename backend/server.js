@@ -25,6 +25,36 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.get("/account", async (_req, res) => {
+  if (!TOKEN) {
+    return res.status(503).json({ ok: false, configured: false, error: "Server API credentials are not configured" });
+  }
+
+  try {
+    const endpoint = new URL(`${PRIMARY_HOST}/${GRAPH_VERSION}/me`);
+    endpoint.searchParams.set("fields", "id,username");
+    endpoint.searchParams.set("access_token", TOKEN);
+
+    const response = await fetch(endpoint);
+    const payload = await safeJson(response);
+
+    if (!response.ok) {
+      return res.status(502).json({
+        ok: false,
+        error: payload?.error?.message || "Unable to read authorized account"
+      });
+    }
+
+    return res.json({
+      ok: true,
+      id: payload?.id || null,
+      username: payload?.username || null
+    });
+  } catch (error) {
+    return res.status(502).json({ ok: false, error: error?.message || "Request failed" });
+  }
+});
+
 app.get("/diagnostics", async (_req, res) => {
   if (!TOKEN || !ACCOUNT_ID) {
     return res.status(503).json({ ok: false, configured: false, error: "Server API credentials are not configured" });
