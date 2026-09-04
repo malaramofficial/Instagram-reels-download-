@@ -1,6 +1,7 @@
 package com.malaram.reelsdownloader;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
