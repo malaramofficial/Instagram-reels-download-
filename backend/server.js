@@ -31,6 +31,38 @@ app.get("/health", (_req, res) =>
   })
 );
 
+app.get("/diagnostics", async (_req, res) => {
+  if (!TOKEN || !ACCOUNT_ID) {
+    return res.status(503).json({ ok: false, configured: false, error: "Server API credentials are not configured" });
+  }
+
+  const hosts = [PRIMARY_HOST, FALLBACK_HOST]
+    .filter((value, index, list) => list.indexOf(value) === index);
+
+  const attempts = [];
+  for (const host of hosts) {
+    try {
+      const endpoint = mediaListUrl(host);
+      const response = await fetch(endpoint);
+      const payload = await safeJson(response);
+      attempts.push({
+        host,
+        ok: response.ok,
+        status: response.status,
+        mediaCountOnFirstPage: Array.isArray(payload?.data) ? payload.data.length : 0,
+        error: response.ok ? null : (payload?.error?.message || "Meta API request failed")
+      });
+      if (response.ok) {
+        return res.json({ ok: true, configured: true, graphVersion: GRAPH_VERSION, attempts });
+      }
+    } catch (error) {
+      attempts.push({ host, ok: false, error: error?.message || "Request failed" });
+    }
+  }
+
+  return res.status(502).json({ ok: false, configured: true, graphVersion: GRAPH_VERSION, attempts });
+});
+
 app.post("/resolve", async (req, res) => {
   const originalUrl = typeof req.body?.url === "string" ? req.body.url.trim() : "";
 
