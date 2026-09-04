@@ -11,9 +11,6 @@ const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
 const TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const ACCOUNT_ID = process.env.ALLOWED_INSTAGRAM_ACCOUNT_ID;
 const PRIMARY_HOST = (process.env.META_API_HOST || "https://graph.instagram.com").replace(/\/$/, "");
-const FALLBACK_HOST = PRIMARY_HOST.includes("graph.instagram.com")
-  ? "https://graph.facebook.com"
-  : "https://graph.instagram.com";
 
 app.get("/", (_req, res) => {
   res.json({ service: "authorized-instagram-media-resolver", ok: true });
@@ -30,39 +27,24 @@ app.get("/health", (_req, res) => {
 
 app.get("/diagnostics", async (_req, res) => {
   if (!TOKEN || !ACCOUNT_ID) {
-    return res.status(503).json({
-      ok: false,
-      configured: false,
-      error: "Server API credentials are not configured"
+    return res.status(503).json({ ok: false, configured: false, error: "Server API credentials are not configured" });
+  }
+
+  try {
+    const response = await fetch(mediaListUrl());
+    const payload = await safeJson(response);
+    return res.status(response.ok ? 200 : 502).json({
+      ok: response.ok,
+      configured: true,
+      graphVersion: GRAPH_VERSION,
+      accountIdConfigured: true,
+      status: response.status,
+      mediaCountOnFirstPage: Array.isArray(payload?.data) ? payload.data.length : 0,
+      error: response.ok ? null : (payload?.error?.message || "Meta API request failed")
     });
+  } catch (error) {
+    return res.status(502).json({ ok: false, configured: true, error: error?.message || "Request failed" });
   }
-
-  const attempts = [];
-  for (const host of uniqueHosts()) {
-    try {
-      const response = await fetch(mediaListUrl(host));
-      const payload = await safeJson(response);
-      attempts.push({
-        host,
-        ok: response.ok,
-        status: response.status,
-        mediaCountOnFirstPage: Array.isArray(payload?.data) ? payload.data.length : 0,
-        error: response.ok ? null : (payload?.error?.message || "Meta API request failed")
-      });
-      if (response.ok) {
-        return res.json({ ok: true, configured: true, graphVersion: GRAPH_VERSION, attempts });
-      }
-    } catch (error) {
-      attempts.push({ host, ok: false, error: error?.message || "Request failed" });
-    }
-  }
-
-  return res.status(502).json({
-    ok: false,
-    configured: true,
-    graphVersion: GRAPH_VERSION,
-    attempts
-  });
 });
 
 app.post("/resolve", async (req, res) => {
@@ -71,33 +53,31 @@ app.post("/resolve", async (req, res) => {
   if (!isInstagramUrl(originalUrl)) {
     return res.status(400).json({ authorized: false, error: "Invalid Instagram URL" });
   }
-
   if (!TOKEN || !ACCOUNT_ID) {
-    return res.status(503).json({
-      authorized: false,
-      error: "Server API credentials are not configured"
-    });
+    return res.status(503).json({ authorized: false, error: "Server API credentials are not configured" });
   }
 
   try {
-    const sharedUrl = await canonicalizeInstagramUrl(originalUrl);
-    const result = await findAuthorizedMedia(sharedUrl);
+    const sharedUrl = normalizeInstagramUrl(await canonicalizeInstagramUrl(originalUrl));
+    const shortcode = instagramShortcode(sharedUrl);
+    const result = await findAuthorizedMedia(sharedUrl, shortcode);
 
     if (!result.item) {
       return res.status(404).json({
         authorized: false,
-        error: "This URL is not media accessible to the authorized Instagram account",
-        checkedUrl: sharedUrl
+        error: "This media was not found in the authorized account's accessible media list",
+        checkedUrl: sharedUrl,
+        shortcode
       });
     }
 
-    const fresh = await getMediaById(result.host, result.item.id);
+    const fresh = await getMediaById(result.item.id);
     const item = fresh || result.item;
 
     if (!item.media_url) {
       return res.status(404).json({
         authorized: false,
-        error: "No downloadable media URL was returned by the official API"
+        error: "No media URL was returned by the official API for this item"
       });
     }
 
@@ -115,61 +95,49 @@ app.post("/resolve", async (req, res) => {
   }
 });
 
-function uniqueHosts() {
-  return [...new Set([PRIMARY_HOST, FALLBACK_HOST])];
-}
-
-async function findAuthorizedMedia(sharedUrl) {
+async function findAuthorizedMedia(sharedUrl, shortcode) {
+  let endpoint = mediaListUrl();
+  let pages = 0;
   let lastError = null;
 
-  for (const host of uniqueHosts()) {
+  while (endpoint && pages < 50) {
+    pages += 1;
     try {
-      let endpoint = mediaListUrl(host);
-      let pages = 0;
+      const response = await fetch(endpoint);
+      const payload = await safeJson(response);
 
-      while (endpoint && pages < 50) {
-        pages += 1;
-        const response = await fetch(endpoint);
-        const payload = await safeJson(response);
-
-        if (!response.ok) {
-          lastError = new Error(payload?.error?.message || "Meta API request failed");
-          break;
-        }
-
-        const item = Array.isArray(payload?.data)
-          ? payload.data.find((media) => sameInstagramUrl(media.permalink, sharedUrl))
-          : null;
-
-        if (item) return { item, host };
-        endpoint = payload?.paging?.next || null;
+      if (!response.ok) {
+        lastError = new Error(payload?.error?.message || "Meta API request failed");
+        break;
       }
+
+      const item = Array.isArray(payload?.data)
+        ? payload.data.find((media) => sameInstagramMedia(media.permalink, sharedUrl, shortcode))
+        : null;
+
+      if (item) return { item };
+      endpoint = payload?.paging?.next || null;
     } catch (error) {
       lastError = error;
+      break;
     }
   }
 
   if (lastError) console.warn("Media lookup failed:", lastError.message || lastError);
-  return { item: null, host: PRIMARY_HOST };
+  return { item: null };
 }
 
-function mediaListUrl(host) {
-  const endpoint = new URL(`${host}/${GRAPH_VERSION}/${encodeURIComponent(ACCOUNT_ID)}/media`);
-  endpoint.searchParams.set(
-    "fields",
-    "id,permalink,media_type,media_url,thumbnail_url,timestamp"
-  );
+function mediaListUrl() {
+  const endpoint = new URL(`${PRIMARY_HOST}/${GRAPH_VERSION}/${encodeURIComponent(ACCOUNT_ID)}/media`);
+  endpoint.searchParams.set("fields", "id,permalink,media_type,media_url,thumbnail_url,timestamp");
   endpoint.searchParams.set("limit", "100");
   endpoint.searchParams.set("access_token", TOKEN);
   return endpoint.toString();
 }
 
-async function getMediaById(host, mediaId) {
-  const endpoint = new URL(`${host}/${GRAPH_VERSION}/${encodeURIComponent(mediaId)}`);
-  endpoint.searchParams.set(
-    "fields",
-    "id,permalink,media_type,media_url,thumbnail_url,timestamp"
-  );
+async function getMediaById(mediaId) {
+  const endpoint = new URL(`${PRIMARY_HOST}/${GRAPH_VERSION}/${encodeURIComponent(mediaId)}`);
+  endpoint.searchParams.set("fields", "id,permalink,media_type,media_url,thumbnail_url,timestamp");
   endpoint.searchParams.set("access_token", TOKEN);
 
   const response = await fetch(endpoint);
@@ -184,19 +152,14 @@ async function canonicalizeInstagramUrl(value) {
       redirect: "follow",
       headers: { "User-Agent": "Mozilla/5.0" }
     });
-    const finalUrl = response.url || value;
-    return isInstagramUrl(finalUrl) ? normalizeInstagramUrl(finalUrl) : normalizeInstagramUrl(value);
+    return response.url || value;
   } catch {
-    return normalizeInstagramUrl(value);
+    return value;
   }
 }
 
 async function safeJson(response) {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
+  try { return await response.json(); } catch { return null; }
 }
 
 function isInstagramUrl(value) {
@@ -215,16 +178,29 @@ function normalizeInstagramUrl(value) {
     const u = new URL(value);
     const host = u.hostname.toLowerCase();
     if (!(host === "instagram.com" || host.endsWith(".instagram.com"))) return "";
-
     const path = u.pathname.replace(/\/+$/, "") || "/";
-    return `https://www.instagram.com${path.endsWith("/") ? path : path + "/"}`;
+    return `https://www.instagram.com${path === "/" ? "/" : path + "/"}`;
   } catch {
     return "";
   }
 }
 
-function sameInstagramUrl(a, b) {
-  return normalizeInstagramUrl(a || "") === normalizeInstagramUrl(b || "");
+function instagramShortcode(value) {
+  try {
+    const parts = new URL(value).pathname.split("/").filter(Boolean);
+    const marker = parts.findIndex((part) => ["reel", "p", "tv"].includes(part.toLowerCase()));
+    return marker >= 0 ? parts[marker + 1] || null : null;
+  } catch {
+    return null;
+  }
+}
+
+function sameInstagramMedia(a, b, shortcode) {
+  const left = normalizeInstagramUrl(a || "");
+  const right = normalizeInstagramUrl(b || "");
+  if (left && right && left === right) return true;
+  const leftCode = instagramShortcode(left);
+  return Boolean(shortcode && leftCode && shortcode === leftCode);
 }
 
 app.listen(process.env.PORT || 3000, () => {
