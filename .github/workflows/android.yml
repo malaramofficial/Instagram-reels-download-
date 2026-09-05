@@ -17,9 +17,18 @@ jobs:
         run: gradle wrapper --gradle-version 8.10.2
       - name: Build release APK
         run: ./gradlew assembleRelease
-      - name: Upload release APK
+      - name: Sign release APK for testing
+        shell: bash
+        run: |
+          set -e
+          BT=$(find "$ANDROID_HOME/build-tools" -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1)
+          keytool -genkeypair -v -keystore release-test.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ReelMate,OU=Android,O=ReelMate,C=IN"
+          "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk app-release-aligned.apk
+          "$BT/apksigner" sign --ks release-test.keystore --ks-pass pass:android --key-pass pass:android --out ReelMate-release.apk app-release-aligned.apk
+          "$BT/apksigner" verify --verbose ReelMate-release.apk
+      - name: Upload installable release APK
         uses: actions/upload-artifact@v4
         with:
           name: ReelMate-release-apk
-          path: app/build/outputs/apk/release/*release*.apk
+          path: ReelMate-release.apk
           if-no-files-found: error
