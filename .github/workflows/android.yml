@@ -15,9 +15,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Generate Gradle wrapper
         run: gradle wrapper --gradle-version 8.10.2
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
+      - name: Build release APK
+        run: ./gradlew assembleRelease
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
         with:
-          name: reels-downloader-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ReelMate-release-apk
+          path: app/build/outputs/apk/release/*release*.apk
+          if-no-files-found: error
